@@ -3,10 +3,304 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Menu Semaine</title>
+<title>Menu Cuisine</title>
+
+<style>
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: Arial;
+  background: #f5f5f5;
+}
+
+h1 {
+  text-align: center;
+  margin: 10px 0;
+}
+
+/* FORM */
+.form {
+  max-width: 420px;
+  margin: auto;
+  background: white;
+  padding: 10px;
+  border-radius: 10px;
+}
+
+input, select, button {
+  width: 100%;
+  padding: 10px;
+  margin: 5px 0;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+button {
+  background: #ff6b6b;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+/* TOPBAR */
+.topbar {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 10px 0;
+}
+
+.smallbtn {
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+}
+
+/* VIEW */
+#view {
+  padding: 10px;
+  overflow: hidden;
+}
+
+/* WEEK (7 jours sur une ligne) */
+.week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+  width: 100%;
+}
+
+/* DAY */
+.day {
+  background: white;
+  border-radius: 8px;
+  padding: 4px;
+
+  height: calc(100vh - 150px);
+  overflow-y: auto;
+
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* TITLE */
+.day h3 {
+  text-align: center;
+  font-size: 9px;
+  background: #eee;
+  border-radius: 5px;
+  padding: 2px;
+  margin: 3px 0;
+}
+
+/* CARD */
+.card {
+  background: #fafafa;
+  border-radius: 6px;
+  padding: 4px;
+  margin-top: 4px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card img {
+  height: 150px;
+  width: 100%;
+  object-fit: cover;
+  border-radius: 5px;
+}
+
+.title {
+  font-weight: bold;
+  font-size: 9px;
+}
+
+.date {
+  font-size: 8px;
+  color: gray;
+}
+
+.card button {
+  font-size: 9px;
+  padding: 3px;
+}
+
+/* FULLSCREEN */
+.focus {
+  position: fixed;
+  inset: 0;
+  background: #f5f5f5;
+  z-index: 9999;
+}
+
+</style>
 </head>
+
 <body>
-<h1>Menu Semaine</h1>
-<p>Mon application est en ligne 🚀</p>
+
+<h1>🍽️ Menu Cuisine</h1>
+
+<div class="topbar">
+  <button class="smallbtn" onclick="viewMode='week'; render()">📅 Semaine</button>
+  <button class="smallbtn" onclick="viewMode='day'; setToday(); render()">👁️ Jour</button>
+  <button class="smallbtn" onclick="toggleFocus()">🖥️ Plein écran</button>
+</div>
+
+<div class="form">
+  <input type="date" id="date">
+  <input id="title" placeholder="Nom recette">
+  <input id="image" placeholder="Image URL">
+  <input id="importUrl" placeholder="🔗 Lien recette">
+  <button onclick="addRecipe()">➕ Ajouter</button>
+</div>
+
+<div id="view"></div>
+
+<script>
+
+const API = "https://menusemaine.feralitv.workers.dev";
+
+let menu = [];
+let viewMode = "week";
+let focusMode = false;
+let selectedDay = "";
+
+/* LOAD */
+async function load() {
+  const res = await fetch(API);
+  menu = await res.json() || [];
+  render();
+}
+
+/* ADD */
+async function addRecipe() {
+  const date = document.getElementById("date").value;
+  let title = document.getElementById("title").value;
+  let image = document.getElementById("image").value;
+  const importUrl = document.getElementById("importUrl").value;
+
+  if (!title && !importUrl) return;
+
+  const recipe = { title, image, url: importUrl, date };
+
+  await fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(recipe)
+  });
+
+  load();
+
+  document.getElementById("date").value = "";
+  document.getElementById("title").value = "";
+  document.getElementById("image").value = "";
+  document.getElementById("importUrl").value = "";
+}
+
+/* DELETE */
+async function del(id) {
+  await fetch(API, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id })
+  });
+
+  load();
+}
+
+/* FULLSCREEN */
+function toggleFocus() {
+  focusMode = !focusMode;
+
+  const form = document.querySelector(".form");
+  const topbar = document.querySelector(".topbar");
+
+  if (focusMode) {
+    document.documentElement.requestFullscreen?.();
+    form.style.display = "none";
+    topbar.style.display = "flex";
+  } else {
+    document.exitFullscreen?.();
+    form.style.display = "block";
+    topbar.style.display = "flex";
+  }
+}
+
+/* JOUR ACTUEL */
+function setToday() {
+  const days = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+  selectedDay = days[new Date().getDay()];
+}
+
+/* DAY NAME */
+function getDayName(date) {
+  const days = ["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+  return days[new Date(date).getDay()];
+}
+
+/* RENDER */
+function render() {
+  const view = document.getElementById("view");
+
+  const days = ["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"];
+
+  if (viewMode === "week") {
+
+    view.className = "week";
+
+    view.innerHTML = days.map(day => {
+
+      const items = menu.filter(m => getDayName(m.date) === day);
+
+      return `
+        <div class="day">
+          <h3>${day.toUpperCase()}</h3>
+
+          ${items.map(i => `
+            <div class="card">
+              ${i.image ? `<img src="${i.image}">` : ""}
+              <div class="title">${i.title}</div>
+              <div class="date">${i.date || ""}</div>
+              <button onclick="del(${i.id})">🗑 Supprimer</button>
+            </div>
+          `).join("")}
+
+        </div>
+      `;
+    }).join("");
+
+  } else if (viewMode === "day") {
+
+    view.className = "week";
+
+    const items = menu.filter(m => getDayName(m.date) === selectedDay);
+
+    view.innerHTML = `
+      <div class="day" style="grid-column: span 7;">
+        <h3>${selectedDay.toUpperCase()}</h3>
+
+        ${items.length === 0 ? "<p>Aucune recette</p>" : ""}
+
+        ${items.map(i => `
+          <div class="card">
+            ${i.image ? `<img src="${i.image}">` : ""}
+            <div class="title">${i.title}</div>
+            <div class="date">${i.date || ""}</div>
+            <button onclick="del(${i.id})">🗑 Supprimer</button>
+          </div>
+        `).join("")}
+
+      </div>
+    `;
+  }
+}
+
+load();
+
+</script>
+
 </body>
 </html>
